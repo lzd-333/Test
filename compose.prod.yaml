@@ -1,0 +1,6 @@
+services:
+  web:
+    image: myweb:v1
+    ports:
+      - "8080:80"
+    restart: unless-stopped

@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>星海 · Stellar Drift</title>
+<style>
+  :root {
+    --ink: #e8eefc;
+    --dim: rgba(200, 218, 255, .5);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    background: #03050c;
+    touch-action: none;
+  }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    cursor: crosshair;
+  }
+
+  /* ---------- 星云背景 ---------- */
+  .nebula {
+    position: fixed;
+    inset: 0;
+    overflow: hidden;
+    z-index: 0;
+    background:
+      radial-gradient(ellipse 120% 90% at 50% 110%, #0b1226 0%, transparent 60%),
+      radial-gradient(ellipse 90% 70% at 50% -10%, #0a0f22 0%, transparent 55%),
+      #03050c;
+  }
+
+  .blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(90px);
+    opacity: .55;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+
+  .b1 {
+    width: 55vmax; height: 55vmax;
+    left: -12vmax; top: -14vmax;
+    background: radial-gradient(circle at 50% 50%, rgba(78, 92, 210, .55), rgba(78, 92, 210, 0) 68%);
+    animation: drift-a 30s ease-in-out infinite alternate;
+  }
+
+  .b2 {
+    width: 48vmax; height: 48vmax;
+    right: -14vmax; top: 6vmax;
+    background: radial-gradient(circle at 50% 50%, rgba(150, 70, 190, .42), rgba(150, 70, 190, 0) 68%);
+    animation: drift-b 36s ease-in-out infinite alternate;
+  }
+
+  .b3 {
+    width: 62vmax; height: 62vmax;
+    left: 22vmax; bottom: -34vmax;
+    background: radial-gradient(circle at 50% 50%, rgba(30, 120, 190, .40), rgba(30, 120, 190, 0) 70%);
+    animation: drift-c 42s ease-in-out infinite alternate;
+  }
+
+  @keyframes drift-a {
+    from { transform: translate3d(0, 0, 0) scale(1); }
+    to   { transform: translate3d(9vmax, 7vmax, 0) scale(1.18); }
+  }
+  @keyframes drift-b {
+    from { transform: translate3d(0, 0, 0) scale(1.1); }
+    to   { transform: translate3d(-8vmax, 10vmax, 0) scale(.92); }
+  }
+  @keyframes drift-c {
+    from { transform: translate3d(0, 0, 0) scale(.95); }
+    to   { transform: translate3d(6vmax, -9vmax, 0) scale(1.15); }
+  }
+
+  /* ---------- 画布 ---------- */
+  #sky {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    display: block;
+  }
+
+  /* ---------- 光标光晕 ---------- */
+  .cursor-glow {
+    position: fixed;
+    left: 0; top: 0;
+    width: 480px; height: 480px;
+    margin-left: -240px;
+    margin-top: -240px;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity .8s ease;
+    background: radial-gradient(circle,
+      rgba(130, 190, 255, .13) 0%,
+      rgba(130, 190, 255, .05) 38%,
+      rgba(130, 190, 255, 0) 68%);
+    will-change: transform;
+  }
+
+  /* ---------- 暗角 ---------- */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    z-index: 3;
+    pointer-events: none;
+    background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(2, 3, 8, .78) 100%);
+  }
+
+  /* ---------- HUD ---------- */
+  .hud {
+    position: fixed;
+    top: clamp(28px, 6vh, 64px);
+    left: clamp(24px, 5vw, 72px);
+    z-index: 4;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .hud h1 {
+    font-size: clamp(28px, 4.2vw, 46px);
+    font-weight: 300;
+    letter-spacing: .34em;
+    line-height: 1.1;
+    background: linear-gradient(100deg, #ffffff 0%, #bcd9ff 42%, #9d8cff 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    text-shadow: 0 0 42px rgba(130, 180, 255, .28);
+  }
+
+  .hud .rule {
+    width: 54px;
+    height: 1px;
+    margin: 18px 0 14px;
+    background: linear-gradient(90deg, rgba(160, 205, 255, .85), rgba(160, 205, 255, 0));
+  }
+
+  .hud .sub {
+    font-size: 11px;
+    letter-spacing: .42em;
+    color: var(--dim);
+    text-transform: uppercase;
+  }
+
+  .corner {
+    position: fixed;
+    right: clamp(24px, 5vw, 72px);
+    top: clamp(28px, 6vh, 64px);
+    z-index: 4;
+    font-size: 10px;
+    letter-spacing: .3em;
+    color: rgba(180, 205, 255, .3);
+    text-align: right;
+    line-height: 2;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  .tip {
+    position: fixed;
+    left: 50%;
+    bottom: clamp(20px, 4vh, 42px);
+    transform: translateX(-50%);
+    z-index: 4;
+    font-size: 12px;
+    letter-spacing: .18em;
+    color: rgba(190, 212, 255, .42);
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+    animation: breathe 5s ease-in-out infinite;
+  }
+
+  .tip span { color: rgba(190, 212, 255, .16); margin: 0 .8em; }
+
+  @keyframes breathe {
+    0%, 100% { opacity: .5; }
+    50%      { opacity: 1; }
+  }
+
+  @media (max-width: 640px) {
+    .hud h1 { letter-spacing: .22em; }
+    .corner { display: none; }
+    .tip { font-size: 11px; letter-spacing: .1em; }
+  }
+</style>
+</head>
+<body>
+
+<div class="nebula">
+  <div class="blob b1"></div>
+  <div class="blob b2"></div>
+  <div class="blob b3"></div>
+</div>
+
+<canvas id="sky"></canvas>
+<div class="cursor-glow" id="glow"></div>
+<div class="vignette"></div>
+
+<div class="hud">
+  <h1>星 海</h1>
+  <div class="rule"></div>
+  <p class="sub">Stellar Drift</p >
+</div>
+
+<div class="corner">
+  N 00°00′ · E 000°00′<br>
+  ∞ / UNKNOWN
+</div>
+
+<p class="tip">移动 扰动星群<span>·</span>点击 点亮星辰</p >
+
+<script>
+(function () {
+  'use strict';
+
+  var canvas = document.getElementById('sky');
+  var ctx = canvas.getContext('2d');
+  var glowEl = document.getElementById('glow');
+
+  var W = 1, H = 1, DPR = 1;
+
+  var pointer = { x: 0, y: 0, tx: 0, ty: 0, active: false };
+
+  /* ---------------- 星点贴图（预渲染，避免逐帧创建渐变） ---------------- */
+  var PALETTE = ['210,232,255', '150,205,255', '196,181,253', '255,224,170'];
+  var WEIGHTS = [0.46, 0.30, 0.16, 0.08];
+
+  function pickColorIndex() {
+    var r = Math.random();
+    for (var i = 0; i < WEIGHTS.length; i++) {
+      r -= WEIGHTS[i];
+      if (r <= 0) return i;
+    }
+    return 0;
+  }
+
+  function makeSprite(rgb) {
+    var size = 64;
+    var c = document.createElement('canvas');
+    c.width = c.height = size;
+    var g = c.getContext('2d');
+    var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0.00, 'rgba(' + rgb + ',1)');
+    grad.addColorStop(0.10, 'rgba(' + rgb + ',0.92)');
+    grad.addColorStop(0.30, 'rgba(' + rgb + ',0.30)');
+    grad.addColorStop(0.62, 'rgba(' + rgb + ',0.055)');
+    grad.addColorStop(1.00, 'rgba(' + rgb + ',0)');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, size, size);
+    return c;
+  }
+
+  var SPRITES = PALETTE.map(makeSprite);
+
+  /* ---------------- 状态 ---------------- */
+  var stars = [];
+  var meteors = [];
+  var ripples = [];
+
+  function buildStars() {
+    var count = Math.round((W * H) / 9000);
+    count = Math.max(110, Math.min(420, count));
+    stars = [];
+    for (var i = 0; i < count; i++) {
+      var depth = Math.random();
+      stars.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        depth: depth,
+        r: 0.35 + depth * depth * 1.7,
+        base: 0.22 + Math.random() * 0.62,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.35 + Math.random() * 1.5,
+        color: pickColorIndex(),
+        ox: 0, oy: 0,     // 弹性位移
+        vx: 0, vy: 0,
+        lit: 0            // 点击点亮
+      });
+    }
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = Math.round(W * DPR);
+    canvas.height = Math.round(H * DPR);
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    if (!pointer.active) {
+      pointer.x = pointer.tx = W / 2;
+      pointer.y = pointer.ty = H / 2;
+    }
+    buildStars();
+  }
+
+  /* ---------------- 流星 ---------------- */
+  function spawnMeteor() {
+    var angle = (26 + Math.random() * 22) * Math.PI / 180;
+    var speed = 9 + Math.random() * 9;
+    meteors.push({
+      x: Math.random() * (W + 300) - 300,
+      y: -120 - Math.random() * 200,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      len: 110 + Math.random() * 130,
+      life: 1
+    });
+    if (meteors.length > 6) meteors.shift();
+  }
+
+  /* ---------------- 主绘制 ---------------- */
+  var NEAR_R = 180;
+
+  function draw(t, dt) {
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+
+    /* 指针缓动 */
+    var ease = 1 - Math.pow(0.86, dt);
+    pointer.x += (pointer.tx - pointer.x) * ease;
+    pointer.y += (pointer.ty - pointer.y) * ease;
+
+    var px = pointer.x;
+    var py = pointer.y;
+    var parCX = px - W / 2;
+    var parCY = py - H / 2;
+
+    if (glowEl) {
+      glowEl.style.transform = 'translate3d(' + px + 'px,' + py + 'px,0)';
+      glowEl.style.opacity = pointer.active ? '1' : '0';
+    }
+
+    /* ---------- 星星 ---------- */
+    var nearList = [];
+
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+
+      // 弹簧回位
+      s.vx += -s.ox * 0.022 * dt;
+      s.vy += -s.oy * 0.022 * dt;
+      var damp = Math.pow(0.93, dt);
+      s.vx *= damp;
+      s.vy *= damp;
+
+      // 鼠标斥力
+      if (pointer.active) {
+        var dx = (s.x + s.ox) - px;
+        var dy = (s.y + s.oy) - py;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < NEAR_R * NEAR_R && d2 > 1) {
+          var d = Math.sqrt(d2);
+          var force = (1 - d / NEAR_R) * 0.9 * dt;
+          s.vx += (dx / d) * force;
+          s.vy += (dy / d) * force;
+          if (d < NEAR_R * 0.85) nearList.push({ s: s, d: d });
+        }
+      }
+
+      s.ox += s.vx * dt;
+      s.oy += s.vy * dt;
+
+      // 视差
+      var parX = parCX * s.depth * 0.03;
+      var parY = parCY * s.depth * 0.03;
+      var sx = s.x + s.ox - parX;
+      var sy = s.y + s.oy - parY;
+
+      // 闪烁
+      var tw = 0.5 + 0.5 * Math.sin(t * s.speed + s.phase);
+      var alpha = s.base * (0.35 + 0.65 * tw);
+      alpha = Math.min(1, alpha + s.lit * 1.2);
+      s.lit *= Math.pow(0.975, dt);
+
+      var size = (1.6 + s.r * 7) * (1 + s.lit * 1.5);
+
+      ctx.globalAlpha = Math.min(1, alpha * 0.95);
+      ctx.drawImage(SPRITES[s.color], sx - size / 2, sy - size / 2, size, size);
+    }
+    ctx.globalAlpha = 1;
+
+    /* ---------- 星座连线 ---------- */
+    if (pointer.active && nearList.length > 1) {
+      nearList.sort(function (a, b) { return a.d - b.d; });
+      var sel = nearList.slice(0, 7);
+      var pos = [];
+      for (var k = 0; k < sel.length; k++) {
+        var st = sel[k].s;
+        pos.push({
+          x: st.x + st.ox - parCX * st.depth * 0.03,
+          y: st.y + st.oy - parCY * st.depth * 0.03
+        });
+      }
+
+      // 指针 → 星
+      ctx.lineWidth = 0.8;
+      for (var m = 0; m < pos.length; m++) {
+        var ddx = pos[m].x - px;
+        var ddy = pos[m].y - py;
+        var dist = Math.sqrt(ddx * ddx + ddy * ddy);
+        var a = Math.max(0, 1 - dist / NEAR_R) * 0.6;
+        if (a < 0.015) continue;
+        ctx.strokeStyle = 'rgba(140,200,255,' + a.toFixed(3) + ')';
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(pos[m].x, pos[m].y);
+        ctx.stroke();
+      }
+
+      // 星 ↔ 星
+      ctx.strokeStyle = 'rgba(190,170,255,0.22)';
+      ctx.lineWidth = 0.6;
+      ctx.beginPath();
+      for (var a1 = 0; a1 < pos.length; a1++) {
+        for (var b1 = a1 + 1; b1 < pos.length; b1++) {
+          var ex = pos[a1].x - pos[b1].x;
+          var ey = pos[a1].y - pos[b1].y;
+          if (Math.sqrt(ex * ex + ey * ey) < 150) {
+            ctx.moveTo(pos[a1].x, pos[a1].y);
+            ctx.lineTo(pos[b1].x, pos[b1].y);
+          }
+        }
+      }
+      ctx.stroke();
+    }
+
+    /* ---------- 点击涟漪 ---------- */
+    for (var r1 = ripples.length - 1; r1 >= 0; r1--) {
+      var rp = ripples[r1];
+      rp.radius += 5 * dt;
+      rp.life -= 0.018 * dt;
+      if (rp.life <= 0) { ripples.splice(r1, 1); continue; }
+      ctx.strokeStyle = 'rgba(160,215,255,' + (rp.life * 0.5).toFixed(3) + ')';
+      ctx.lineWidth = 1.4 * rp.life;
+      ctx.beginPath();
+      ctx.arc(rp.x, rp.y, rp.radius, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    /* ---------- 流星 ---------- */
+    if (Math.random() < 0.007 * dt) spawnMeteor();
+
+    for (var mi = meteors.length - 1; mi >= 0; mi--) {
+      var mt = meteors[mi];
+      mt.x += mt.vx * dt;
+      mt.y += mt.vy * dt;
+      mt.life -= 0.004 * dt;
+
+      if (mt.life <= 0 || mt.x > W + 400 || mt.y > H + 400) {
+        meteors.splice(mi, 1);
+        continue;
+      }
+
+      var sp = Math.sqrt(mt.vx * mt.vx + mt.vy * mt.vy) || 1;
+      var tailX = mt.x - (mt.vx / sp) * mt.len;
+      var tailY = mt.y - (mt.vy / sp) * mt.len;
+
+      var g = ctx.createLinearGradient(mt.x, mt.y, tailX, tailY);
+      g.addColorStop(0, 'rgba(255,255,255,' + (0.95 * mt.life).toFixed(3) + ')');
+      g.addColorStop(0.25, 'rgba(170,215,255,' + (0.55 * mt.life).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(120,170,255,0)');
+
+      ctx.strokeStyle = g;
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(mt.x, mt.y);
+      ctx.lineTo(tailX, tailY);
+      ctx.stroke();
+
+      ctx.globalAlpha = mt.life;
+      ctx.drawImage(SPRITES[0], mt.x - 9, mt.y - 9, 18, 18);
+      ctx.globalAlpha = 1;
+    }
+
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  /* ---------------- 循环 ---------------- */
+  var lastTime = performance.now();
+
+  function frame(now) {
+    var dt = (now - lastTime) / 1000 * 60;
+    lastTime = now;
+    if (!isFinite(dt) || dt <= 0) dt = 1;
+    dt = Math.min(dt, 3);
+
+    draw(now / 1000, dt);
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------------- 交互 ---------------- */
+  window.addEventListener('pointermove', function (e) {
+    pointer.tx = e.clientX;
+    pointer.ty = e.clientY;
+    pointer.active = true;
+  }, { passive: true });
+
+  window.addEventListener('pointerdown', function (e) {
+    pointer.tx = e.clientX;
+    pointer.ty = e.clientY;
+    pointer.active = true;
+
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var dx = s.x - e.clientX;
+      var dy = s.y - e.clientY;
+      var d = Math.sqrt(dx * dx + dy * dy);
+      if (d < 260) {
+        var l = 1 - d / 260;
+        if (l > s.lit) s.lit = l;
+      }
+    }
+
+    ripples.push({ x: e.clientX, y: e.clientY, radius: 4, life: 1 });
+    if (ripples.length > 8) ripples.shift();
+  }, { passive: true });
+
+  var resizeTimer = null;
+  window.addEventListener('resize', function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 120);
+  });
+
+  /* ---------------- 启动 ---------------- */
+  resize();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
